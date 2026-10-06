@@ -14,7 +14,13 @@ import {
   showChangedFiles,
 } from "./src/changed-files-view.ts";
 import { runCommand, type CommandRunner } from "./src/process.ts";
+import {
+  pullRequestViewArgs,
+  resolvePullRequestRepository,
+} from "./src/pull-request.ts";
 import { makeRefreshCoordinator } from "./src/refresh-coordinator.ts";
+import { formatGitStatus } from "./src/status.ts";
+import { installGitFooter } from "./src/footer.ts";
 import {
   createRuntime,
   runEffect,
@@ -56,12 +62,27 @@ export default function gitInfo(pi: ExtensionAPI) {
   let runtime: GitInfoRuntime | undefined;
   let pollingFiber: Fiber.Fiber<void> | undefined;
   let currentContext: ExtensionContext | undefined;
+  let restoreFooter: (() => void) | undefined;
   let generation = 0;
   let queriedPrBranch: string | null = null;
   const refreshCoordinator = makeRefreshCoordinator();
 
   const getRuntime = () => (runtime ??= createRuntime());
-  const publish = () => pi.events.emit(GIT_INFO_CHANNEL, { ...state });
+  const publish = () => {
+    pi.events.emit(GIT_INFO_CHANNEL, { ...state });
+    if (currentContext?.hasUI) {
+      const status = formatGitStatus(
+        state,
+        currentContext.mode === "tui" ? undefined : false,
+      );
+      currentContext.ui.setStatus(
+        "git-info",
+        status === undefined
+          ? undefined
+          : currentContext.ui.theme.fg("muted", status),
+      );
+    }
+  };
   const run = (
     command: string,
     args: string[],
@@ -71,9 +92,15 @@ export default function gitInfo(pi: ExtensionAPI) {
 
   const lookupPullRequest = (ctx: ExtensionContext, branch: string) =>
     Effect.gen(function* () {
+      // Target the repository explicitly: in fork checkouts gh prefers the
+      // upstream remote and misses PRs opened on origin.
+      const repository = yield* resolvePullRequestRepository(
+        ctx.cwd,
+        GIT_TIMEOUT_MS,
+      );
       const result = yield* run(
         "gh",
-        ["pr", "view", branch, "--json", "number,url,state,isDraft"],
+        pullRequestViewArgs(branch, repository),
         ctx,
         GH_TIMEOUT_MS,
       );
@@ -190,6 +217,17 @@ export default function gitInfo(pi: ExtensionAPI) {
   pi.on("session_start", async (_event, ctx) => {
     generation += 1;
     queriedPrBranch = null;
+    state = emptyGitInfoState();
+    currentContext = ctx;
+    restoreFooter?.();
+    restoreFooter = installGitFooter(ctx);
+    if (ctx.mode === "tui" && !restoreFooter) {
+      ctx.ui.notify(
+        "Git status alignment requires Pi's built-in footer.",
+        "warning",
+      );
+    }
+    publish();
 
     const previousPollingFiber = pollingFiber;
     pollingFiber = undefined;
@@ -212,9 +250,12 @@ export default function gitInfo(pi: ExtensionAPI) {
     refreshInBackground(ctx);
   });
 
-  pi.on("session_shutdown", async () => {
+  pi.on("session_shutdown", async (_event, ctx) => {
     stopRefreshListener();
     generation += 1;
+    if (ctx.hasUI) ctx.ui.setStatus("git-info", undefined);
+    restoreFooter?.();
+    restoreFooter = undefined;
     currentContext = undefined;
     pollingFiber = undefined;
     const closing = runtime;

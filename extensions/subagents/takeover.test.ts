@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   reconcileDashboardSelection,
+  requestAbortOrDismiss,
   type DashboardSelection,
 } from "./src/ui/takeover.ts";
 
@@ -26,4 +27,18 @@ test("dashboard selection follows its subagent id and falls back by row", () => 
 
   reconcileDashboardSelection(selection, []);
   assert.deepEqual(selection, { id: undefined, index: 0 });
+});
+
+test("dashboard x aborts running subagents and dismisses settled ones", () => {
+  const calls: string[] = [];
+  const view = {
+    requestAbort: (id: string) => calls.push(`abort:${id}`),
+    requestDismiss: (id: string) => calls.push(`dismiss:${id}`),
+  };
+
+  requestAbortOrDismiss(view, { id: "btw-1", status: "running" });
+  requestAbortOrDismiss(view, { id: "btw-2", status: "done" });
+  requestAbortOrDismiss(view, { id: "btw-3", status: "error" });
+
+  assert.deepEqual(calls, ["abort:btw-1", "dismiss:btw-2", "dismiss:btw-3"]);
 });

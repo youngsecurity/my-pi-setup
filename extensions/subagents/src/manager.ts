@@ -119,6 +119,8 @@ export interface SubagentReadModel {
   requestSend(id: string, text: string): void;
   /** Fire-and-forget: abort a running subagent (dashboard `x`, takeover). */
   requestAbort(id: string): void;
+  /** Remove a settled subagent from the dashboard and release its session. */
+  requestDismiss(id: string): void;
   /**
    * Register the settle hook. `consumed` is true when an active
    * subagent_wait/cancel is collecting the result (so it must not also be
@@ -265,6 +267,23 @@ const makeManager = Effect.gen(function* () {
       cleanups.add(fiber);
       fiber.addObserver(() => cleanups.delete(fiber));
     }
+  };
+
+  const dismissSettled = (id: string) => {
+    const entry = entries.get(id);
+    if (
+      !entry ||
+      entry.snapshot.status === "running" ||
+      entry.restarting === true ||
+      waitInterest.has(id)
+    )
+      return;
+
+    entries.delete(id);
+    notify(id);
+    const fiber = runDetached(closeEntryScope(entry));
+    cleanups.add(fiber);
+    fiber.addObserver(() => cleanups.delete(fiber));
   };
 
   const settle = (entry: Entry, outcome: RunOutcome) => {
@@ -708,6 +727,7 @@ const makeManager = Effect.gen(function* () {
       // flows back to the parent as a follow-up message, matching v1.
       runDetached(abortEntry(entry).pipe(Effect.ignore));
     },
+    requestDismiss: dismissSettled,
     setOnSettled: (hook) => {
       onSettled = hook;
     },

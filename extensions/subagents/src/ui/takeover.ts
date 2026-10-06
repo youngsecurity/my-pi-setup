@@ -106,6 +106,14 @@ export interface DashboardSelection {
   index: number;
 }
 
+export function requestAbortOrDismiss(
+  view: Pick<SubagentReadModel, "requestAbort" | "requestDismiss">,
+  snap: Pick<SubagentSnapshot, "id" | "status">,
+) {
+  if (snap.status === "running") view.requestAbort(snap.id);
+  else view.requestDismiss(snap.id);
+}
+
 export function reconcileDashboardSelection(
   selection: DashboardSelection,
   subs: ReadonlyArray<Pick<SubagentSnapshot, "id">>,
@@ -203,7 +211,7 @@ class SubagentDashboard implements Component {
     }
     if (data === "x") {
       const snap = subs[this.selection.index];
-      if (snap && snap.status === "running") this.view.requestAbort(snap.id);
+      if (snap) requestAbortOrDismiss(this.view, snap);
       return;
     }
   }
@@ -284,7 +292,7 @@ class SubagentDashboard implements Component {
       truncateToWidth(
         theme.fg(
           "dim",
-          `  ${configuredKeys(this.keybindings, "tui.select.up")}/${configuredKeys(this.keybindings, "tui.select.down")}/jk select · ${configuredKeys(this.keybindings, "tui.select.confirm")} take over · x abort · ${configuredKeys(this.keybindings, "tui.select.cancel")} close`,
+          `  ${configuredKeys(this.keybindings, "tui.select.up")}/${configuredKeys(this.keybindings, "tui.select.down")}/jk select · ${configuredKeys(this.keybindings, "tui.select.confirm")} take over · x abort/dismiss · ${configuredKeys(this.keybindings, "tui.select.cancel")} close`,
         ),
         width,
       ),

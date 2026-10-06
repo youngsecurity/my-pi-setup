@@ -1,22 +1,40 @@
 {
   "dependencies": {
-    "@earendil-works/pi-ai": "^0.82.0",
-    "@earendil-works/pi-coding-agent": "^0.82.0",
-    "@earendil-works/pi-tui": "^0.82.0",
+    "@earendil-works/pi-ai": "0.85.1",
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@earendil-works/pi-tui": "0.85.1",
     "acorn": "^8.17.0",
     "firecrawl": "^4.30.0",
-    "typebox": "^1.3.6"
+    "typebox": "^1.3.6",
+    "effect": "4.0.0-rc.110"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
-    "prettier": "^3.9.5",
-    "typescript": "^7.0.2"
+    "prettier": "3.9.6",
+    "typescript": "^7.0.2",
+    "@effect/tsgo": "0.36.5"
   },
   "type": "module",
   "scripts": {
     "check": "tsc --noEmit",
     "format": "prettier --write \"extensions/**/*.{ts,cjs}\" \"*.json\"",
     "format:check": "prettier --check \"extensions/**/*.{ts,cjs}\" \"*.json\"",
-    "test": "node --test --experimental-strip-types extensions/*/*.test.ts && npm --prefix extensions/file-search test"
-  }
+    "test": "node --test --experimental-strip-types extensions/shared/*.test.ts && npm run test --workspaces --if-present",
+    "prepare": "effect-tsgo patch",
+    "test:live": "npm run test:live --workspace subagents"
+  },
+  "private": true,
+  "overrides": {
+    "@effect/platform-node-shared": "4.0.0-rc.110"
+  },
+  "workspaces": [
+    "extensions/ask-user",
+    "extensions/background-terminals",
+    "extensions/copy-all",
+    "extensions/file-search",
+    "extensions/git-info",
+    "extensions/model-info",
+    "extensions/subagents",
+    "extensions/workflows"
+  ]
 }

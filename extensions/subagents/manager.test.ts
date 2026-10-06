@@ -138,6 +138,27 @@ test("cancel interrupts a running stub subagent", async () => {
   });
 });
 
+test("settled subagents can be dismissed while running ones stay tracked", async () => {
+  await withManager(async (manager, runtime) => {
+    const settled = await runTool(
+      runtime,
+      manager.spawn("claude", task("Finished task")),
+    );
+    await runTool(runtime, manager.waitFor([settled.id]));
+    const running = await runTool(
+      runtime,
+      manager.spawn("codex", task("Still running")),
+    );
+
+    manager.view.requestDismiss(settled.id);
+    manager.view.requestDismiss(running.id);
+
+    assert.equal(manager.view.get(settled.id), undefined);
+    assert.equal(manager.view.get(running.id)?.status, "running");
+    await runTool(runtime, manager.cancel([running.id]));
+  });
+});
+
 test("spawn origin propagates to ids, snapshots, and settlement", async () => {
   await withManager(async (manager, runtime) => {
     const settled: Array<{ id: string; origin: string }> = [];

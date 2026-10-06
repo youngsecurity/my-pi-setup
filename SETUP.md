@@ -4,8 +4,37 @@ Clone or copy this repository to `~/.pi/agent`, then install its dependencies:
 
 ```sh
 cd ~/.pi/agent
-npm install
+npm ci
 ```
+
+Use Node.js 24 or newer. The root npm workspace installs the eight synchronized
+extensions and their dependencies together. The root `package-lock.json` is the
+lockfile for those extensions; do not install dependencies separately inside them.
+Pi's development packages are pinned to 0.85.1, matching the version used to
+validate the synchronized code. Use Pi 0.85.1 or newer at runtime.
+
+After deliberately changing dependency versions, run `npm install` from the root
+and commit the updated root lockfile. The root `prepare` script patches the shared
+TypeScript toolchain once.
+
+Validation from the root:
+
+```sh
+npm run check
+npm run format:check
+npm test
+```
+
+There is no standalone lint command. Consider adding one if additional static
+rules beyond type checking and formatting are needed.
+
+`npm test` runs the synchronized extensions' non-live tests and shared-helper
+tests. `npm run test:live` is a separate opt-in command for Claude/Codex integration
+tests; it requires authenticated harnesses and may incur usage charges. Tests for
+extensions outside the synchronized set are not part of that default test command.
+
+See [Synchronization](docs/synchronization.md) for the component inventory and
+how this fork relates to the installed copies in dotagents.
 
 ## Firecrawl
 
